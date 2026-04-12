@@ -15,6 +15,7 @@ import numpy as np
 import streamlit as st
 import torch
 from torchvision.utils import make_grid
+from dataclasses import fields
 
 from adaptive_diffusion.config import DiffusionConfig
 from adaptive_diffusion.evaluation.metrics import (
@@ -34,12 +35,25 @@ from adaptive_diffusion.visualization.schedule_viz import (
 
 
 @st.cache_resource(show_spinner=False)
-def load_model(checkpoint_path: str | None = None) -> AdaptiveDiffusionModel:
+def load_model(
+    checkpoint_path: str | None = None,
+    schedule_mode: str = "adaptive",
+) -> AdaptiveDiffusionModel:
     """Load model from checkpoint if available."""
-    config = DiffusionConfig()
+    config = DiffusionConfig(schedule_mode=schedule_mode, device="auto")
     model = AdaptiveDiffusionModel(config=config)
     if checkpoint_path is not None and Path(checkpoint_path).exists():
         payload = torch.load(checkpoint_path, map_location="cpu")
+        if "config" in payload:
+            valid_keys = {f.name for f in fields(DiffusionConfig)}
+            ckpt_config = {
+                key: value
+                for key, value in payload["config"].items()
+                if key in valid_keys
+            }
+            ckpt_config["schedule_mode"] = schedule_mode
+            ckpt_config["device"] = "auto"
+            model = AdaptiveDiffusionModel(config=DiffusionConfig(**ckpt_config))
         model.load_state_dict(payload["model_state"], strict=True)
     device = resolve_device("auto")
     model.to(device).eval()
@@ -49,7 +63,11 @@ def load_model(checkpoint_path: str | None = None) -> AdaptiveDiffusionModel:
 def _plot_schedule(
     model: AdaptiveDiffusionModel, class_idx: int, show_fixed: bool, num_timesteps: int
 ) -> plt.Figure:
+    if not model.is_adaptive:
+        raise ValueError("Schedule explorer requires an adaptive model checkpoint.")
     device = next(model.parameters()).device
+    if model.schedule_class_embedding is None or model.schedule_net is None:
+        raise ValueError("Adaptive schedule modules are missing.")
     label = torch.tensor([class_idx], device=device, dtype=torch.long)
     class_emb = model.schedule_class_embedding(label).squeeze(0)
     beta = (
@@ -101,9 +119,15 @@ def main() -> None:
     )
     st.markdown("[arXiv paper](https://arxiv.org/abs/0000.00000)")
 
-    checkpoint_path = st.sidebar.text_input("Checkpoint path (optional)", value="")
-    model = load_model(checkpoint_path if checkpoint_path else None)
-    device = next(model.parameters()).device
+    adaptive_ckpt = st.sidebar.text_input("Adaptive checkpoint", value="")
+    fixed_ckpt = st.sidebar.text_input("Fixed checkpoint", value="")
+    adaptive_model = load_model(
+        adaptive_ckpt if adaptive_ckpt else None, schedule_mode="adaptive"
+    )
+    fixed_model = load_model(
+        fixed_ckpt if fixed_ckpt else None, schedule_mode="fixed_cosine"
+    )
+    device = next(adaptive_model.parameters()).device
 
     st.header("Section 2 — Schedule Explorer")
     class_idx = st.sidebar.selectbox(
@@ -115,12 +139,12 @@ def main() -> None:
     num_timesteps = st.sidebar.slider(
         "Num timesteps",
         min_value=10,
-        max_value=model.config.num_timesteps,
-        value=200,
+        max_value=adaptive_model.config.num_timesteps,
+        value=min(200, adaptive_model.config.num_timesteps),
         step=10,
     )
     fig_schedule = _plot_schedule(
-        model=model,
+        model=adaptive_model,
         class_idx=class_idx,
         show_fixed=show_fixed,
         num_timesteps=num_timesteps,
@@ -137,8 +161,11 @@ def main() -> None:
     num_steps = st.sidebar.slider(
         "Generation steps",
         min_value=10,
-        max_value=model.config.num_timesteps,
-        value=model.config.num_sample_steps_ddim,
+        max_value=adaptive_model.config.num_timesteps,
+        value=min(
+            adaptive_model.config.num_sample_steps_ddim,
+            adaptive_model.config.num_timesteps,
+        ),
         step=5,
     )
     method = st.sidebar.selectbox(
@@ -150,16 +177,16 @@ def main() -> None:
         with st.spinner("Generating samples..."):
             with torch.inference_mode():
                 if method == "DDIM adaptive":
-                    samples, elapsed = model.ddim_sample(
+                    samples, elapsed = adaptive_model.ddim_sample(
                         class_labels=labels, num_steps=num_steps
                     )
                 elif method == "DDPM adaptive":
-                    samples, elapsed = model.ddpm_sample(
+                    samples, elapsed = adaptive_model.ddpm_sample(
                         class_labels=labels, num_steps=num_steps
                     )
                 else:
                     start = time.perf_counter()
-                    samples = model.fixed_schedule_sample(
+                    samples, _ = fixed_model.ddim_sample(
                         class_labels=labels, num_steps=num_steps
                     )
                     synchronize(device)
@@ -170,9 +197,19 @@ def main() -> None:
 
     st.header("Section 4 — Efficiency Frontier")
     if st.button("Compute efficiency frontier (takes ~2 min)"):
+        if not adaptive_ckpt or not fixed_ckpt:
+            st.warning(
+                "Provide both adaptive and fixed checkpoints for fair frontier comparison."
+            )
+            st.stop()
         with st.spinner("Computing efficiency frontier..."):
             with torch.inference_mode():
-                metrics_df = compute_efficiency_frontier(model=model)
+                metrics_df = compute_efficiency_frontier(
+                    adaptive_model=adaptive_model,
+                    fixed_model=fixed_model,
+                    num_images=adaptive_model.config.num_fid_samples,
+                    repeats=adaptive_model.config.num_eval_repeats,
+                )
                 fig = plot_efficiency_frontier(
                     metrics_df,
                     save_path="adaptive_diffusion/samples/efficiency_frontier.png",
@@ -182,9 +219,20 @@ def main() -> None:
 
     st.header("Section 5 — Per-class Analysis")
     if st.button("Compute per-class metrics"):
+        if not adaptive_ckpt or not fixed_ckpt:
+            st.warning(
+                "Provide both adaptive and fixed checkpoints for fair per-class analysis."
+            )
+            st.stop()
         with st.spinner("Computing per-class metrics..."):
             with torch.inference_mode():
-                per_class_df = compute_per_class_metrics(model=model)
+                per_class_df = compute_per_class_metrics(
+                    adaptive_model=adaptive_model,
+                    fixed_model=fixed_model,
+                    samples_per_class=adaptive_model.config.num_fid_samples
+                    // adaptive_model.config.num_classes,
+                    repeats=adaptive_model.config.num_eval_repeats,
+                )
                 fig = plot_per_class_speedup(
                     per_class_df,
                     save_path="adaptive_diffusion/samples/per_class_speedup.png",

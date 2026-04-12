@@ -48,6 +48,31 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--wandb-project", type=str, default=None, help="wandb project name override."
     )
+    parser.add_argument("--seed", type=int, default=None, help="Random seed override.")
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=None,
+        help="Dataloader worker count override.",
+    )
+    parser.add_argument(
+        "--data-root",
+        type=str,
+        default=None,
+        help="Dataset root directory override.",
+    )
+    parser.add_argument(
+        "--checkpoint-dir",
+        type=str,
+        default=None,
+        help="Checkpoint directory override.",
+    )
+    parser.add_argument(
+        "--sample-dir",
+        type=str,
+        default=None,
+        help="Sample directory override.",
+    )
     parser.add_argument(
         "--schedule-mode",
         type=str,
@@ -67,13 +92,22 @@ def main() -> None:
         num_epochs=args.epochs if args.epochs is not None else base.num_epochs,
         device=args.device if args.device is not None else base.device,
         schedule_mode=(
-            args.schedule_mode
-            if args.schedule_mode is not None
-            else base.schedule_mode
+            args.schedule_mode if args.schedule_mode is not None else base.schedule_mode
         ),
+        checkpoint_dir=(
+            args.checkpoint_dir
+            if args.checkpoint_dir is not None
+            else base.checkpoint_dir
+        ),
+        sample_dir=args.sample_dir if args.sample_dir is not None else base.sample_dir,
         wandb_project=(
             args.wandb_project if args.wandb_project is not None else base.wandb_project
         ),
+        seed=args.seed if args.seed is not None else base.seed,
+        num_workers=(
+            args.num_workers if args.num_workers is not None else base.num_workers
+        ),
+        data_root=args.data_root if args.data_root is not None else base.data_root,
     )
     set_seed(config.seed)
 
@@ -90,7 +124,9 @@ def main() -> None:
     elif runtime_device.type == "mps":
         print("Using Apple Metal Performance Shaders (MPS) backend.")
 
-    train_loader, val_loader = get_cifar10_dataloaders(config=config)
+    train_loader, val_loader = get_cifar10_dataloaders(
+        config=config, root=config.data_root, num_workers=config.num_workers
+    )
     model = AdaptiveDiffusionModel(config=config)
     trainer = Trainer(
         model=model, config=config, train_loader=train_loader, val_loader=val_loader

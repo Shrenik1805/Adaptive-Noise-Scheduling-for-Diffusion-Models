@@ -199,9 +199,9 @@ class ScheduleNet(nn.Module):
         monotone_prior = 6.0 * (t_normalized - 0.5)
         logits = logits + monotone_prior
 
-        beta_raw = bounds.beta_min + (bounds.beta_max - bounds.beta_min) * torch.sigmoid(
-            logits
-        )
+        beta_raw = bounds.beta_min + (
+            bounds.beta_max - bounds.beta_min
+        ) * torch.sigmoid(logits)
         # Guarantee small early noise so alpha_bar[0] remains above 0.99 by construction.
         early_cap = torch.tensor(0.009, device=beta_raw.device, dtype=beta_raw.dtype)
         beta_cap_t = early_cap + (bounds.beta_max - early_cap) * t_normalized

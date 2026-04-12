@@ -28,6 +28,14 @@ adaptive_diffusion/
 python3 -m venv .venv && source .venv/bin/activate && pip install -r adaptive_diffusion/requirements.txt
 ```
 
+Windows PowerShell setup:
+
+```powershell
+py -3 -m venv .venv
+.\\.venv\\Scripts\\Activate.ps1
+python -m pip install -r adaptive_diffusion/requirements.txt
+```
+
 ## Colab Setup Cells
 
 ```python
@@ -57,22 +65,31 @@ def set_seed(seed: int = 42) -> None:
 set_seed(42)
 ```
 
-## One-command Training
+## Training (Fair Comparison Protocol)
 
 ```bash
-source .venv/bin/activate && python -m adaptive_diffusion.train
+source .venv/bin/activate && python -m adaptive_diffusion.train --schedule-mode adaptive --checkpoint-dir ./checkpoints_adaptive --sample-dir ./samples_adaptive
 ```
 
-Useful overrides:
+Train fixed-cosine baseline with identical architecture/hyperparameters:
 
 ```bash
-source .venv/bin/activate && python -m adaptive_diffusion.train --epochs 100 --batch-size 128 --lr 2e-4 --device cuda
+source .venv/bin/activate && python -m adaptive_diffusion.train --schedule-mode fixed_cosine --checkpoint-dir ./checkpoints_fixed --sample-dir ./samples_fixed
 ```
 
 Apple Silicon (M-series) training:
 
 ```bash
-source .venv/bin/activate && python -m adaptive_diffusion.train --device mps
+source .venv/bin/activate && python -m adaptive_diffusion.train --schedule-mode adaptive --device mps
+source .venv/bin/activate && python -m adaptive_diffusion.train --schedule-mode fixed_cosine --device mps
+```
+
+Windows + NVIDIA GPU training:
+
+```powershell
+.\\.venv\\Scripts\\Activate.ps1
+python -m adaptive_diffusion.train --schedule-mode adaptive --device cuda
+python -m adaptive_diffusion.train --schedule-mode fixed_cosine --device cuda
 ```
 
 Check MPS availability:
@@ -114,11 +131,71 @@ The following modules are available:
 - `adaptive_diffusion/evaluation/metrics.py`: efficiency frontier, per-class metrics, schedule diversity.
 - `adaptive_diffusion/visualization/schedule_viz.py`: publication-quality schedule and frontier figures.
 
-Run full evaluation pipeline:
+Run full paired-checkpoint evaluation:
 
 ```bash
-source .venv/bin/activate && python -m adaptive_diffusion.evaluate --checkpoint ./checkpoints/<best>.pt --device mps
+source .venv/bin/activate && python -m adaptive_diffusion.evaluate \
+  --adaptive-checkpoint ./checkpoints_adaptive/<best_adaptive>.pt \
+  --fixed-checkpoint ./checkpoints_fixed/<best_fixed>.pt \
+  --device mps \
+  --num-fid-samples 10000 \
+  --samples-per-class 1000 \
+  --repeats 3
 ```
+
+Interpretation guidance:
+
+- At equal step count, adaptive is not expected to be faster per step.
+- The core claim is frontier shift: adaptive reaches the same FID at fewer steps (or lower time at matched quality).
+- Always compare separately trained checkpoints (`adaptive` vs `fixed_cosine`), not fixed-sampler counterfactuals from an adaptive-trained denoiser.
+
+## One-command Full Pipeline
+
+Run adaptive training + fixed baseline training + paired evaluation + summary artifacts:
+
+```bash
+chmod +x scripts/run_pair_experiment.sh
+DEVICE=mps EPOCHS=100 BATCH_SIZE=128 LR=2e-4 RUN_TAG=paper_v1 scripts/run_pair_experiment.sh
+```
+
+Windows PowerShell equivalent:
+
+```powershell
+.\\.venv\\Scripts\\Activate.ps1
+scripts\\run_pair_experiment.ps1 -Device cuda -Epochs 100 -BatchSize 128 -LearningRate 2e-4 -RunTag paper_v1
+```
+
+Multi-seed protocol (recommended for paper claims):
+
+```bash
+source .venv/bin/activate && python scripts/run_multi_seed_experiment.py \
+  --python python \
+  --device mps \
+  --seeds 42 43 44 \
+  --epochs 100 \
+  --batch-size 128 \
+  --lr 2e-4 \
+  --run-prefix paper_multiseed
+```
+
+Configurable environment variables:
+
+- `DEVICE` (default: `mps`)
+- `EPOCHS` (default: `100`)
+- `BATCH_SIZE` (default: `128`)
+- `LR` (default: `2e-4`)
+- `WANDB_MODE` (default: `online`)
+- `NUM_FID_SAMPLES` (default: `10000`)
+- `SAMPLES_PER_CLASS` (default: `1000`)
+- `REPEATS` (default: `3`)
+- `RUN_TAG` (default: `default`)
+
+Outputs include:
+
+- `adaptive_diffusion/analysis_<RUN_TAG>/efficiency_frontier.csv`
+- `adaptive_diffusion/analysis_<RUN_TAG>/per_class_metrics.csv`
+- `adaptive_diffusion/analysis_<RUN_TAG>/summary_metrics.csv`
+- `adaptive_diffusion/analysis_<RUN_TAG>/summary_report.md`
 
 ## Paper + Derivation
 
@@ -131,3 +208,11 @@ source .venv/bin/activate && python -m adaptive_diffusion.evaluate --checkpoint 
 - Forward-pass invariants are asserted in `ScheduleNet`.
 - Gradcheck tests cover novel schedule regularizers.
 - EMA checkpoints and config snapshots are saved during training.
+- Checkpoint loading in evaluation restores full training config to avoid architecture mismatch.
+- Data loader seeding is deterministic (`seed + worker_id`) for reproducible runs.
+
+## GitHub CI
+
+- Workflow: `.github/workflows/ci.yml`
+- Runs on `ubuntu-latest`, `macos-latest`, and `windows-latest`
+- Checks: `black --check` and full `pytest` suite

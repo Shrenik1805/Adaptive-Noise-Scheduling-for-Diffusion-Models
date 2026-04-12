@@ -85,13 +85,13 @@
 \maketitle
 
 \begin{abstract}
-Diffusion models typically use a fixed noise schedule shared across all samples, despite large variation in semantic complexity across classes. We introduce \textbf{Adaptive Noise Scheduling} (ANS), a class-conditional framework that learns $\beta_t(x)$ using a dedicated ScheduleNet and jointly optimizes generation fidelity, schedule efficiency, and temporal smoothness. ScheduleNet receives a class embedding and timestep encoding, then predicts bounded per-step noise levels with differentiable constraints enforcing valid diffusion dynamics. Our objective augments standard $\epsilon$-prediction loss with (i) an efficiency term that discourages unnecessary cumulative noise and (ii) a smoothness regularizer stabilizing reverse trajectories. On CIFAR-10, ANS is designed to improve the quality--latency frontier by matching or improving FID at lower denoising cost versus fixed linear/cosine schedules and DDIM baselines. We further provide per-class analyses showing schedule diversity aligned with class-dependent generation difficulty, supporting the hypothesis that adaptive schedules can better allocate diffusion budget than one-size-fits-all noise policies.
+Diffusion models typically use a fixed noise schedule shared across all samples, despite large variation in semantic complexity across classes. We introduce \textbf{Adaptive Noise Scheduling} (ANS), a class-conditional framework that learns $\beta_t(y)$ using a dedicated ScheduleNet and jointly optimizes generation fidelity, schedule efficiency, and temporal smoothness. ScheduleNet receives class embedding and timestep encoding, then predicts bounded per-step noise levels with differentiable constraints enforcing valid diffusion dynamics. Our objective augments standard $\epsilon$-prediction loss with (i) an efficiency term that discourages unnecessary cumulative noise and (ii) a smoothness regularizer stabilizing schedule trajectories. For evaluation, we use a fair paired-checkpoint protocol: adaptive and fixed-cosine models are trained separately under matched architecture and optimization settings. We report FID--time frontiers with repeated sampling runs and uncertainty estimates, emphasizing the correct claim: adaptive scheduling should improve quality-time tradeoffs by reaching comparable fidelity at fewer denoising steps, not by reducing per-step compute at identical step counts.
 \end{abstract}
 
 \section{Introduction}
 Diffusion models have become a dominant paradigm for high-fidelity generation~\cite{ho2020ddpm,nichol2021improved,dhariwal2021guided}. A central but under-adapted component is the forward noise schedule $\{\beta_t\}_{t=1}^T$, usually fixed (linear or cosine) for all data points. This global schedule ignores heterogeneity in data complexity: classes with simple structure may not require the same perturbation profile as classes with fine texture and shape ambiguity.
 
-We propose \textbf{Adaptive Noise Scheduling (ANS)}, where a neural scheduler outputs class-specific $\beta_t(x)$ and is trained jointly with the diffusion denoiser.
+We propose \textbf{Adaptive Noise Scheduling (ANS)}, where a neural scheduler outputs class-specific $\beta_t(y)$ and is trained jointly with the diffusion denoiser.
 
 Contributions:
 \begin{itemize}
@@ -114,14 +114,14 @@ Training minimizes
 
 \section{Method}
 \subsection{Adaptive Schedule Parameterization}
-Let $g_\phi$ denote ScheduleNet. Given class embedding $\mathbf{c}(x)$ and timestep $t$, we predict
+Let $g_\phi$ denote ScheduleNet. Given class embedding $\mathbf{c}(y)$ and timestep $t$, we predict
 \begin{align}
-\beta_t(x) = g_\phi\!\left(\mathbf{c}(x), \text{PE}(t/T)\right), \quad \beta_t(x)\in[\beta_{\min},\beta_{\max}],
+\beta_t(y) = g_\phi\!\left(\mathbf{c}(y), \text{PE}(t/T)\right), \quad \beta_t(y)\in[\beta_{\min},\beta_{\max}],
 \end{align}
 with learnable bounds satisfying $0<\beta_{\min}<\beta_{\max}\le 0.02$.
 Then
 \begin{align}
-\bar{\alpha}_t(x) = \prod_{i=1}^{t}\left(1-\beta_i(x)\right).
+\bar{\alpha}_t(y) = \prod_{i=1}^{t}\left(1-\beta_i(y)\right).
 \end{align}
 
 \subsection{Joint Objective}
@@ -133,27 +133,27 @@ We optimize:
 \end{align}
 where
 \begin{align}
-\mathcal{L}_{\text{efficiency}} &= \mathbb{E}_{x}\left[\sum_{t=1}^T \beta_t(x)\right], \\
-\mathcal{L}_{\text{smoothness}} &= \mathbb{E}_{x}\left[\sum_{t=1}^{T-1}\left(\beta_{t+1}(x)-\beta_t(x)\right)^2\right].
+\mathcal{L}_{\text{efficiency}} &= \mathbb{E}_{y}\left[\sum_{t=1}^T \beta_t(y)\right], \\
+\mathcal{L}_{\text{smoothness}} &= \mathbb{E}_{y}\left[\sum_{t=1}^{T-1}\left(\beta_{t+1}(y)-\beta_t(y)\right)^2\right].
 \end{align}
 
-\paragraph{Why $\mathcal{L}_{\text{efficiency}}$ encourages fewer steps.}
-For fixed denoiser capacity, large cumulative noise implies larger reverse correction magnitude and typically more denoising iterations to reach target fidelity. Minimizing $\sum_t \beta_t(x)$ reduces average corruption budget, lowering the effective reverse integration burden. Empirically, this shifts the FID--latency frontier toward fewer-step operating points.
+\paragraph{Why $\mathcal{L}_{\text{efficiency}}$ can improve the frontier.}
+For fixed denoiser capacity, large cumulative noise implies larger reverse correction magnitude. Minimizing $\sum_t \beta_t(y)$ reduces average corruption budget and can preserve sample fidelity under coarser reverse discretizations (fewer DDIM steps). We therefore evaluate the method through quality-time frontier shifts rather than same-step speed comparisons.
 
 \section{Experiments}
 \subsection{Setup}
-Dataset: CIFAR-10 ($32\times32$). Base denoiser: class-conditional U-Net. ScheduleNet: residual MLP with sinusoidal timestep encoding.
+Dataset: CIFAR-10 ($32\times32$). Base denoiser: class-conditional U-Net. ScheduleNet: residual MLP with sinusoidal timestep encoding. We train \emph{two separate checkpoints}: (i) adaptive schedule mode and (ii) fixed cosine schedule mode, using matched architecture and optimization settings.
 
 \subsection{Baselines}
-We compare ANS to fixed linear schedule, fixed cosine schedule~\cite{nichol2021improved}, and DDIM acceleration~\cite{song2020ddim}.
+Primary baseline is a separately trained fixed-cosine model~\cite{nichol2021improved}. We additionally report linear schedules and DDIM step sweeps~\cite{song2020ddim}. We do \emph{not} treat fixed-sampler counterfactuals from adaptive-trained weights as primary baselines.
 
 \subsection{Metrics}
-Primary metrics: FID, wall-clock sampling time, per-class speedup ratio, and schedule diversity (pairwise class schedule distance).
+Primary metrics: FID (with large-sample protocol), wall-clock sampling time, per-class FID/time, and schedule diversity (pairwise class schedule distance). For all key tables we report mean$\pm$std over repeated sampling runs.
 
 \section{Results}
 \begin{table}[t]
 \centering
-\caption{Main quality/efficiency comparison on CIFAR-10.}
+\caption{Main quality/efficiency comparison on CIFAR-10 (separately trained checkpoints, mean$\pm$std over repeated runs).}
 \begin{tabular}{lcc}
 \toprule
 Method & FID $\downarrow$ & Time (s / 64 imgs) $\downarrow$ \\
@@ -168,7 +168,7 @@ Adaptive DDPM-1000 & \placeholder{xx.xx} & \placeholder{x.xxx} \\
 
 \begin{table}[t]
 \centering
-\caption{Per-class adaptive-vs-fixed summary (CIFAR-10).}
+\caption{Per-class adaptive-vs-fixed summary (class-matched real references, mean$\pm$std).}
 \begin{tabular}{lccc}
 \toprule
 Class & FID$_{\text{adaptive}}$ & FID$_{\text{fixed}}$ & Speedup \\
@@ -211,7 +211,7 @@ We ablate:
 We report effects on FID, runtime, schedule diversity, and training stability.
 
 \section{Conclusion}
-Adaptive class-conditional noise scheduling is a simple, differentiable extension of DDPM training that directly targets the fidelity-efficiency tradeoff. By replacing fixed schedules with learned $\beta_t(x)$ and regularizing for smooth, low-noise trajectories, ANS provides a principled path to faster diffusion sampling while preserving quality.
+Adaptive class-conditional noise scheduling is a simple, differentiable extension of DDPM training that targets the fidelity-efficiency tradeoff. With fair paired-checkpoint evaluation, ANS should be interpreted as a method for improving the FID-time frontier (comparable quality at fewer steps), rather than as a same-step runtime acceleration mechanism.
 
 \bibliographystyle{plain}
 \bibliography{refs}

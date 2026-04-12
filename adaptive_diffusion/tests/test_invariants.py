@@ -6,6 +6,7 @@ import pytest
 import torch
 
 from adaptive_diffusion.config import DiffusionConfig
+from adaptive_diffusion.evaluation.metrics import compute_schedule_diversity
 from adaptive_diffusion.models.diffusion import AdaptiveDiffusionModel
 from adaptive_diffusion.models.schedule_net import ScheduleNet
 from adaptive_diffusion.models.unet import UNet
@@ -72,3 +73,21 @@ def test_noise_prediction_unbiased() -> None:
     labels = torch.randint(0, config.num_classes, (32,))
     pred = unet(x, t, labels)
     assert abs(float(pred.mean().detach())) < 0.1
+
+
+def test_schedule_diversity_zero_for_fixed_mode() -> None:
+    config = _tiny_config()
+    fixed_model = AdaptiveDiffusionModel(
+        DiffusionConfig(
+            image_size=config.image_size,
+            feature_dim=config.feature_dim,
+            schedule_hidden_dim=config.schedule_hidden_dim,
+            unet_base_channels=config.unet_base_channels,
+            unet_channel_multipliers=config.unet_channel_multipliers,
+            unet_attention_resolutions=config.unet_attention_resolutions,
+            num_timesteps=config.num_timesteps,
+            schedule_mode="fixed_cosine",
+        )
+    )
+    diversity = compute_schedule_diversity(fixed_model)
+    assert diversity == 0.0

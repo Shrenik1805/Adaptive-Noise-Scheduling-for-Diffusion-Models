@@ -77,3 +77,16 @@ def test_ddim_faster_than_ddpm() -> None:
     )
     _, ddim_time = model.ddim_sample(class_labels=labels, num_steps=50)
     assert ddim_time < ddpm_time
+
+
+def test_fixed_schedule_mode_runs_losses() -> None:
+    config = replace(_tiny_config(), schedule_mode="fixed_cosine")
+    model = AdaptiveDiffusionModel(config)
+    x0 = torch.randn(
+        config.batch_size, config.in_channels, config.image_size, config.image_size
+    )
+    labels = torch.randint(0, config.num_classes, (config.batch_size,))
+    loss_dict = model.p_losses(x0=x0, class_labels=labels)
+    assert torch.isfinite(loss_dict["loss"]).item()
+    assert float(loss_dict["loss_efficiency"].detach()) == 0.0
+    assert float(loss_dict["loss_smoothness"].detach()) == 0.0

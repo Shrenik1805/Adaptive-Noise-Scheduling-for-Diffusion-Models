@@ -61,6 +61,14 @@ def plot_schedule_grid(
     embedding_noise_std: float = 0.01,
 ) -> plt.Figure:
     """Plot class-wise adaptive schedules against fixed cosine schedule."""
+    if not model.is_adaptive:
+        raise ValueError(
+            "plot_schedule_grid requires an adaptive model with ScheduleNet."
+        )
+    if model.schedule_net is None or model.schedule_class_embedding is None:
+        raise ValueError(
+            "Adaptive model is missing schedule modules required for plotting."
+        )
     _set_pub_style()
     device = next(model.parameters()).device
     fixed = (
@@ -118,16 +126,16 @@ def plot_efficiency_frontier(metrics_df: pd.DataFrame, save_path: str) -> plt.Fi
     fig, ax = plt.subplots(figsize=(6, 4))
 
     ax.plot(
-        metrics_df["time_adaptive"],
-        metrics_df["fid_adaptive"],
+        metrics_df["time_adaptive_mean"],
+        metrics_df["fid_adaptive_mean"],
         color="tab:blue",
         marker="o",
         linestyle="-",
         label="Adaptive",
     )
     ax.plot(
-        metrics_df["time_fixed"],
-        metrics_df["fid_fixed"],
+        metrics_df["time_fixed_mean"],
+        metrics_df["fid_fixed_mean"],
         color="tab:red",
         marker="o",
         linestyle="--",
@@ -137,27 +145,31 @@ def plot_efficiency_frontier(metrics_df: pd.DataFrame, save_path: str) -> plt.Fi
     for _, row in metrics_df.iterrows():
         ax.annotate(
             str(int(row["num_steps"])),
-            (row["time_adaptive"], row["fid_adaptive"]),
+            (row["time_adaptive_mean"], row["fid_adaptive_mean"]),
             fontsize=7,
         )
         ax.annotate(
             str(int(row["num_steps"])),
-            (row["time_fixed"], row["fid_fixed"]),
+            (row["time_fixed_mean"], row["fid_fixed_mean"]),
             fontsize=7,
         )
 
     improvement_x = np.minimum(
-        metrics_df["time_adaptive"].to_numpy(), metrics_df["time_fixed"].to_numpy()
+        metrics_df["time_adaptive_mean"].to_numpy(),
+        metrics_df["time_fixed_mean"].to_numpy(),
     )
     improvement_y = np.minimum(
-        metrics_df["fid_adaptive"].to_numpy(), metrics_df["fid_fixed"].to_numpy()
+        metrics_df["fid_adaptive_mean"].to_numpy(),
+        metrics_df["fid_fixed_mean"].to_numpy(),
     )
     ax.fill_between(
         np.sort(improvement_x),
         np.interp(
             np.sort(improvement_x), np.sort(improvement_x), np.sort(improvement_y)
         ),
-        y2=max(metrics_df["fid_fixed"].max(), metrics_df["fid_adaptive"].max()),
+        y2=max(
+            metrics_df["fid_fixed_mean"].max(), metrics_df["fid_adaptive_mean"].max()
+        ),
         color="tab:green",
         alpha=0.08,
         label="Improvement region",

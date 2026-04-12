@@ -66,20 +66,31 @@ def get_cifar10_dataloaders(
     )
 
     use_cuda = torch.cuda.is_available() and config.device.startswith("cuda")
+    generator = torch.Generator()
+    generator.manual_seed(config.seed)
+
+    def _seed_worker(worker_id: int) -> None:
+        torch.manual_seed(config.seed + worker_id)
+
+    loader_kwargs = {
+        "num_workers": num_workers,
+        "pin_memory": pin_memory and use_cuda,
+        "worker_init_fn": _seed_worker,
+        "generator": generator,
+        "persistent_workers": num_workers > 0,
+    }
     train_loader = DataLoader(
         train_set,
         batch_size=config.batch_size,
         shuffle=True,
-        num_workers=num_workers,
-        pin_memory=pin_memory and use_cuda,
+        **loader_kwargs,
         drop_last=True,
     )
     val_loader = DataLoader(
         val_set,
         batch_size=config.batch_size,
         shuffle=False,
-        num_workers=num_workers,
-        pin_memory=pin_memory and use_cuda,
+        **loader_kwargs,
         drop_last=False,
     )
     return train_loader, val_loader

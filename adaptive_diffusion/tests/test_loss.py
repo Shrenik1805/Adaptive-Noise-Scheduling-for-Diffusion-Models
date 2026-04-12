@@ -77,3 +77,22 @@ def test_lambda_scaling() -> None:
     contrib_b = float((2.0 * config_a.lambda_efficiency) * eff)
     assert contrib_b > contrib_a
     assert abs(contrib_b / max(contrib_a, 1e-8) - 2.0) < 1e-6
+
+
+def test_fixed_mode_disables_schedule_regularizers() -> None:
+    config = DiffusionConfig(
+        num_timesteps=64,
+        feature_dim=16,
+        schedule_hidden_dim=32,
+        schedule_mode="fixed_cosine",
+        unet_base_channels=16,
+        unet_channel_multipliers=(1, 2),
+    )
+    loss_module = AdaptiveLoss(schedule_net=None, config=config)
+    pred = torch.randn(4, 3, 16, 16, requires_grad=True)
+    target = torch.randn_like(pred)
+    out = loss_module(pred, target, class_embeddings=None)
+    assert float(out["loss_efficiency"].detach()) == 0.0
+    assert float(out["loss_smoothness"].detach()) == 0.0
+    out["loss"].backward()
+    assert pred.grad is not None
