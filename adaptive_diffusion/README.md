@@ -171,6 +171,7 @@ Multi-seed protocol (recommended for paper claims):
 source .venv/bin/activate && python scripts/run_multi_seed_experiment.py \
   --python python \
   --device mps \
+  --num-workers 0 \
   --seeds 42 43 44 \
   --epochs 100 \
   --batch-size 128 \

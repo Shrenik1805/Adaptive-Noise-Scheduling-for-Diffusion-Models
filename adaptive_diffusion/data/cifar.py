@@ -12,6 +12,24 @@ from torchvision import datasets, transforms
 from adaptive_diffusion.config import DiffusionConfig
 
 
+def _seed_worker(worker_id: int) -> None:
+    """Seed dataloader worker process deterministically.
+
+    Notes
+    -----
+    This function must stay module-level (not nested) so it is picklable
+    under Python 3.14 spawn/forkserver multiprocessing start methods.
+    """
+    worker_info = torch.utils.data.get_worker_info()
+    if worker_info is None:
+        return
+    dataset = worker_info.dataset
+    seed = getattr(dataset, "_seed", None)
+    if seed is None:
+        return
+    torch.manual_seed(int(seed) + worker_id)
+
+
 def _build_transforms(image_size: int) -> tuple[transforms.Compose, transforms.Compose]:
     """Construct train/eval transforms for CIFAR-10."""
     train_transform = transforms.Compose(
@@ -68,9 +86,8 @@ def get_cifar10_dataloaders(
     use_cuda = torch.cuda.is_available() and config.device.startswith("cuda")
     generator = torch.Generator()
     generator.manual_seed(config.seed)
-
-    def _seed_worker(worker_id: int) -> None:
-        torch.manual_seed(config.seed + worker_id)
+    setattr(train_set, "_seed", int(config.seed))
+    setattr(val_set, "_seed", int(config.seed))
 
     loader_kwargs = {
         "num_workers": num_workers,

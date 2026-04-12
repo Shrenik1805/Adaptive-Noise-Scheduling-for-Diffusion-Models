@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 from pathlib import Path
 
@@ -27,6 +28,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", type=str, default="auto", help="Device target.")
     parser.add_argument("--epochs", type=int, default=100, help="Epoch count.")
     parser.add_argument("--batch-size", type=int, default=128, help="Batch size.")
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=0,
+        help=(
+            "Dataloader workers passed to training runs. "
+            "Use 0 on Python 3.14/macOS to avoid multiprocessing pickling issues."
+        ),
+    )
     parser.add_argument("--lr", type=float, default=2e-4, help="Learning rate.")
     parser.add_argument(
         "--wandb-mode",
@@ -71,7 +81,11 @@ def parse_args() -> argparse.Namespace:
 def _run_command(command: list[str], env: dict[str, str] | None = None) -> None:
     """Run subprocess command and raise on failure."""
     print("Running:", " ".join(command))
-    subprocess.run(command, check=True, env=env)
+    merged_env = None
+    if env is not None:
+        merged_env = os.environ.copy()
+        merged_env.update(env)
+    subprocess.run(command, check=True, env=merged_env)
 
 
 def _aggregate_seed_summaries(summary_paths: list[Path], output_dir: Path) -> None:
@@ -123,7 +137,10 @@ def main() -> None:
             str(args.lr),
             "--seed",
             str(seed),
+            "--num-workers",
+            str(args.num_workers),
         ]
+        train_env = {"WANDB_MODE": args.wandb_mode}
 
         _run_command(
             common_train
@@ -134,7 +151,8 @@ def main() -> None:
                 adaptive_ckpt_dir,
                 "--sample-dir",
                 adaptive_sample_dir,
-            ]
+            ],
+            env=train_env,
         )
         _run_command(
             common_train
@@ -145,7 +163,8 @@ def main() -> None:
                 fixed_ckpt_dir,
                 "--sample-dir",
                 fixed_sample_dir,
-            ]
+            ],
+            env=train_env,
         )
 
         find_best_cmd = [

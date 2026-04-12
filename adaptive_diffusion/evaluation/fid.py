@@ -23,7 +23,10 @@ class FIDCalculator:
     def __init__(
         self, device: torch.device | str = "cpu", feature_dim: int = 2048
     ) -> None:
-        self.device = torch.device(device)
+        requested = torch.device(device)
+        # TorchMetrics FID keeps float64 buffers internally; MPS does not support float64.
+        # Run FID on CPU when MPS is requested to keep training/eval portable on Apple Silicon.
+        self.device = torch.device("cpu") if requested.type == "mps" else requested
         self.feature_dim = feature_dim
         self._metrics: dict[str, FrechetInceptionDistance] = {}
         self._real_loaded: set[str] = set()
