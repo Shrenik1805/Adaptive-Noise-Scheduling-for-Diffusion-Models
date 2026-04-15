@@ -1,9 +1,0 @@
-2026-04-09 12:30:48,022 INFO    MainThread:2974 [wandb_setup.py:_flush():81] Current SDK version is 0.25.1
-2026-04-09 12:30:48,022 INFO    MainThread:2974 [wandb_setup.py:_flush():81] Configure stats pid to 2974
-2026-04-09 12:30:48,022 INFO    MainThread:2974 [wandb_setup.py:_flush():81] Loading settings from environment variables
-2026-04-09 12:30:48,023 INFO    MainThread:2974 [wandb_init.py:setup_run_log_directory():717] Logging user logs to /Users/shrenikj/Downloads/GenAI_Proj/wandb/offline-run-20260409_123048-r18vnpof/logs/debug.log
-2026-04-09 12:30:48,023 INFO    MainThread:2974 [wandb_init.py:setup_run_log_directory():718] Logging internal logs to /Users/shrenikj/Downloads/GenAI_Proj/wandb/offline-run-20260409_123048-r18vnpof/logs/debug-internal.log
-2026-04-09 12:30:48,023 INFO    MainThread:2974 [wandb_init.py:init():844] calling init triggers
-2026-04-09 12:30:48,023 INFO    MainThread:2974 [wandb_init.py:init():849] wandb.init called with sweep_config: {}
-config: {'image_size': 16, 'in_channels': 3, 'num_classes': 10, 'num_timesteps': 128, 'beta_min': 0.0001, 'beta_max': 0.02, 'feature_dim': 16, 'schedule_hidden_dim': 32, 'schedule_num_layers': 3, 'unet_base_channels': 16, 'unet_channel_multipliers': (1, 2), 'unet_attention_resolutions': (8,), 'batch_size': 8, 'learning_rate': 0.0002, 'ema_decay': 0.9999, 'gradient_clip_norm': 1.0, 'num_epochs': 1, 'warmup_steps': 1, 'lambda_efficiency': 0.01, 'lambda_smoothness': 0.1, 'wandb_project': 'adaptive-diffusion', 'seed': 42, 'device': 'mps', 'checkpoint_dir': './adaptive_diffusion/checkpoints_smoke', 'sample_dir': './adaptive_diffusion/samples_smoke', 'num_sample_steps_ddpm': 1000, 'num_sample_steps_ddim': 50, '_wandb': {}}
-2026-04-09 12:30:48,023 INFO    MainThread:2974 [wandb_init.py:init():892] starting backend

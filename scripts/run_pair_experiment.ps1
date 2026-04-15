@@ -10,7 +10,9 @@ Param(
     [int]$Repeats = 3,
     [string]$RunTag = "default",
     [int]$Seed = 42,
-    [int]$NumWorkers = 2
+    [int]$NumWorkers = 2,
+    [int]$ValidateEvery = 5,
+    [int]$ValidateBatches = 50
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,10 +26,10 @@ $analysisDir = "./adaptive_diffusion/analysis_$RunTag"
 $env:WANDB_MODE = $WandbMode
 
 Write-Host "Training adaptive model..."
-& $PythonExe -m adaptive_diffusion.train --schedule-mode adaptive --device $Device --epochs $Epochs --batch-size $BatchSize --lr $LearningRate --seed $Seed --num-workers $NumWorkers --checkpoint-dir $adaptiveCkptDir --sample-dir $adaptiveSampleDir
+& $PythonExe -m adaptive_diffusion.train --schedule-mode adaptive --device $Device --epochs $Epochs --batch-size $BatchSize --lr $LearningRate --seed $Seed --num-workers $NumWorkers --validate-every $ValidateEvery --validate-batches $ValidateBatches --checkpoint-dir $adaptiveCkptDir --sample-dir $adaptiveSampleDir
 
 Write-Host "Training fixed-cosine baseline..."
-& $PythonExe -m adaptive_diffusion.train --schedule-mode fixed_cosine --device $Device --epochs $Epochs --batch-size $BatchSize --lr $LearningRate --seed $Seed --num-workers $NumWorkers --checkpoint-dir $fixedCkptDir --sample-dir $fixedSampleDir
+& $PythonExe -m adaptive_diffusion.train --schedule-mode fixed_cosine --device $Device --epochs $Epochs --batch-size $BatchSize --lr $LearningRate --seed $Seed --num-workers $NumWorkers --validate-every $ValidateEvery --validate-batches $ValidateBatches --checkpoint-dir $fixedCkptDir --sample-dir $fixedSampleDir
 
 function Find-BestCheckpoint([string]$CheckpointDir) {
     $pattern = 'epoch_\d+_fid_([0-9]+(?:\.[0-9]+)?)\.pt$'

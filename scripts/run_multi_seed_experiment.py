@@ -39,6 +39,18 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--lr", type=float, default=2e-4, help="Learning rate.")
     parser.add_argument(
+        "--validate-every",
+        type=int,
+        default=1,
+        help="Run validation every N epochs (also runs at final epoch).",
+    )
+    parser.add_argument(
+        "--validate-batches",
+        type=int,
+        default=2,
+        help="Number of validation batches per validation step.",
+    )
+    parser.add_argument(
         "--wandb-mode",
         type=str,
         default="online",
@@ -139,6 +151,10 @@ def main() -> None:
             str(seed),
             "--num-workers",
             str(args.num_workers),
+            "--validate-every",
+            str(args.validate_every),
+            "--validate-batches",
+            str(args.validate_batches),
         ]
         train_env = {"WANDB_MODE": args.wandb_mode}
 

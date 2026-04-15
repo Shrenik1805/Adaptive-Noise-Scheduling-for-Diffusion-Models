@@ -47,6 +47,8 @@ class DiffusionConfig:
     num_eval_repeats: int = 3
     data_root: str = "./data"
     num_workers: int = 2
+    validate_every_epochs: int = 5
+    validate_num_batches: int = 50
 
     def __post_init__(self) -> None:
         """Validate configuration invariants."""
@@ -91,6 +93,10 @@ class DiffusionConfig:
             raise ValueError("num_eval_repeats must be positive.")
         if self.num_workers < 0:
             raise ValueError("num_workers must be non-negative.")
+        if self.validate_every_epochs <= 0:
+            raise ValueError("validate_every_epochs must be positive.")
+        if self.validate_num_batches <= 0:
+            raise ValueError("validate_num_batches must be positive.")
 
     def to_dict(self) -> dict[str, Any]:
         """Return JSON-serializable representation of config.

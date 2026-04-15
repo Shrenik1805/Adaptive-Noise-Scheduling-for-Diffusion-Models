@@ -25,6 +25,7 @@ dist/
 
 # Project artifacts
 wandb/
+data/
 checkpoints*/
 samples*/
 adaptive_diffusion/analysis*/

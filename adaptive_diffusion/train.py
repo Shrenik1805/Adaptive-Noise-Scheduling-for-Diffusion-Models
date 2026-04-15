@@ -62,6 +62,18 @@ def parse_args() -> argparse.Namespace:
         help="Dataset root directory override.",
     )
     parser.add_argument(
+        "--validate-every",
+        type=int,
+        default=None,
+        help="Run validation every N epochs (also runs at final epoch).",
+    )
+    parser.add_argument(
+        "--validate-batches",
+        type=int,
+        default=None,
+        help="Number of validation dataloader batches to use per validation.",
+    )
+    parser.add_argument(
         "--checkpoint-dir",
         type=str,
         default=None,
@@ -108,6 +120,16 @@ def main() -> None:
             args.num_workers if args.num_workers is not None else base.num_workers
         ),
         data_root=args.data_root if args.data_root is not None else base.data_root,
+        validate_every_epochs=(
+            args.validate_every
+            if args.validate_every is not None
+            else base.validate_every_epochs
+        ),
+        validate_num_batches=(
+            args.validate_batches
+            if args.validate_batches is not None
+            else base.validate_num_batches
+        ),
     )
     set_seed(config.seed)
 

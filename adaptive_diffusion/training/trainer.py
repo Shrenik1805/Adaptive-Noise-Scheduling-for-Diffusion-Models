@@ -345,8 +345,13 @@ class Trainer:
                 except Exception as exc:  # pragma: no cover
                     print(f"Skipping schedule visualization due to error: {exc}")
 
-            if epoch % 5 == 0:
-                val_metrics = self.validate(num_batches=50)
+            do_validate = (epoch % self.config.validate_every_epochs == 0) or (
+                epoch == target_epochs
+            )
+            if do_validate:
+                val_metrics = self.validate(
+                    num_batches=self.config.validate_num_batches
+                )
                 self._wandb_log(val_metrics, step=self.global_step)
                 self.save_checkpoint(epoch=epoch, metrics=val_metrics)
 

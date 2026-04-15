@@ -23,6 +23,8 @@ REPEATS="${REPEATS:-3}"
 RUN_TAG="${RUN_TAG:-default}"
 SEED="${SEED:-42}"
 NUM_WORKERS="${NUM_WORKERS:-2}"
+VALIDATE_EVERY="${VALIDATE_EVERY:-5}"
+VALIDATE_BATCHES="${VALIDATE_BATCHES:-50}"
 
 ADAPTIVE_CKPT_DIR="${ADAPTIVE_CKPT_DIR:-./checkpoints_adaptive_${RUN_TAG}}"
 FIXED_CKPT_DIR="${FIXED_CKPT_DIR:-./checkpoints_fixed_${RUN_TAG}}"
@@ -39,6 +41,8 @@ echo "  WANDB_MODE=${WANDB_MODE}"
 echo "  RUN_TAG=${RUN_TAG}"
 echo "  SEED=${SEED}"
 echo "  NUM_WORKERS=${NUM_WORKERS}"
+echo "  VALIDATE_EVERY=${VALIDATE_EVERY}"
+echo "  VALIDATE_BATCHES=${VALIDATE_BATCHES}"
 
 export WANDB_MODE
 
@@ -51,6 +55,8 @@ echo "Training adaptive model..."
   --lr "${LR}" \
   --seed "${SEED}" \
   --num-workers "${NUM_WORKERS}" \
+  --validate-every "${VALIDATE_EVERY}" \
+  --validate-batches "${VALIDATE_BATCHES}" \
   --checkpoint-dir "${ADAPTIVE_CKPT_DIR}" \
   --sample-dir "${ADAPTIVE_SAMPLE_DIR}"
 
@@ -63,6 +69,8 @@ echo "Training fixed-cosine baseline..."
   --lr "${LR}" \
   --seed "${SEED}" \
   --num-workers "${NUM_WORKERS}" \
+  --validate-every "${VALIDATE_EVERY}" \
+  --validate-batches "${VALIDATE_BATCHES}" \
   --checkpoint-dir "${FIXED_CKPT_DIR}" \
   --sample-dir "${FIXED_SAMPLE_DIR}"
 
